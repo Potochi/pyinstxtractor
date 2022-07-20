@@ -211,7 +211,7 @@ class PyInstArchive:
 
         # Additional data after the cookie
         tailBytes = self.fileSize - self.cookiePos - (self.PYINST20_COOKIE_SIZE if self.pyinstVer == 20 else self.PYINST21_COOKIE_SIZE)
-        
+
         # Overlay is the data appended at the end of the PE
         self.overlaySize = lengthofPackage + tailBytes
         self.overlayPos = self.fileSize - self.overlaySize
@@ -323,7 +323,7 @@ class PyInstArchive:
 
             if self.pymaj >= 3 and self.pymin >= 7:                # PEP 552 -- Deterministic pycs
                 pycFile.write(b'\0' * 4)        # Bitfield
-                pycFile.write(b'\0' * 8)        # (Timestamp + size) || hash 
+                pycFile.write(b'\0' * 8)        # (Timestamp + size) || hash
 
             else:
                 pycFile.write(b'\0' * 4)      # Timestamp
@@ -400,40 +400,58 @@ class PyInstArchive:
                 else:
                     self._writePyc(filePath, data)
 
+def get_pyinstaller_python_version(archive_path):
+    arch = PyInstArchive(archive_path)
+    result = None
+
+    if arch.open():
+        if arch.checkFile():
+            if arch.getCArchiveInfo():
+                if hasattr(arch, "pymaj") and hasattr(arch, "pymin"):
+                    result = arch.pymaj, arch.pymin
+
+    arch.close()
+    return result
+
+
+def extract_arvhive(output_dir, archive_path):
+    arch = PyInstArchive(archive_path)
+    if arch.open():
+        if arch.checkFile():
+            if arch.getCArchiveInfo():
+                arch.parseTOC()
+                arch.extractFiles(output_dir)
+
+        arch.close()
+
+def usage():
+    print("Usage:\npyinstxtractor.py i <archive_path>\npyinstxtractor.py e <archive_path> <output_dir>")
+    exit(1)
+
 def main():
-    if len(sys.argv) != 4:
-        print("Usage: test.py <i|e> <output_dir> <archive_path>")
-        exit(1)
+    if len(sys.argv) < 3:
+        usage()
 
     if sys.argv[1] == "i":
         info_mode = True
     elif sys.argv[1] == "e":
         info_mode = False
     else:
-        raise ValueError("Invalid info_mode switch")
+        raise ValueError("Invalid first param. Must be 'i' or 'e'")
 
-    output_dir = sys.argv[2]
-    archive_path = sys.argv[3]
+    archive_path = sys.argv[2]
 
-    arch = PyInstArchive(archive_path)
-    if arch.open():
-        if arch.checkFile():
-            if arch.getCArchiveInfo():
-                if info_mode:
-                    print("[*] Required python version: <{}.{}>".format(arch.pymaj, arch.pymin))
-                    arch.close()
-                    return
-
-                arch.parseTOC()
-                arch.extractFiles(output_dir)
-                arch.close()
-                print('[+] Successfully extracted pyinstaller archive: {0}'.format(sys.argv[1]))
-                print('')
-                print('You can now use a python decompiler on the pyc files within the extracted directory')
-                arch.close()
-                return
-
-        arch.close()
+    if info_mode:
+        version = get_pyinstaller_python_version(archive_path)
+        if version is not None:
+            print("[*] Archive requires python version {}.{}".format(version[0], version[1]))
+        else:
+            print("[!] Failed to detect python version")
+    else:
+        if len(sys.argv) != 4:
+            usage()
+        output_dir = sys.argv[3]
+        extract_arvhive(output_dir, archive_path)
 
 
 if __name__ == '__main__':
