@@ -268,7 +268,7 @@ class PyInstArchive:
             f.write(data)
 
 
-    def extractFiles(self, extractionDir):
+    def extractFiles(self, extractionDir, no_sanity_check):
         print('[+] Beginning extraction...please standby')
 
         if not os.path.exists(extractionDir):
@@ -284,7 +284,11 @@ class PyInstArchive:
                 data = zlib.decompress(data)
                 # Malware may tamper with the uncompressed size
                 # Comment out the assertion in such a case
-                assert len(data) == entry.uncmprsdDataSize # Sanity Check
+                if not no_sanity_check:
+                    assert len(data) == entry.uncmprsdDataSize # Sanity Check
+                else:
+                    if len(data) != entry.uncmprsdDataSize:
+                        print("[!] Uncompressed data size not equal to size defined in header. Maybe tampered.")
 
             if entry.typeCmprsData == b'd' or entry.typeCmprsData == b'o':
                 # d -> ARCHIVE_ITEM_DEPENDENCY
@@ -420,7 +424,7 @@ def extract_arvhive(output_dir, archive_path):
         if arch.checkFile():
             if arch.getCArchiveInfo():
                 arch.parseTOC()
-                arch.extractFiles(output_dir)
+                arch.extractFiles(output_dir, True)
 
         arch.close()
 
