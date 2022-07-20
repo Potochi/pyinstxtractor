@@ -199,6 +199,8 @@ class PyInstArchive:
                 # Read CArchive cookie
                 (magic, lengthofPackage, toc, tocLen, pyver, pylibname) = \
                 struct.unpack('!8siiii64s', self.fPtr.read(self.PYINST21_COOKIE_SIZE))
+            else:
+                raise RuntimeError("Unknown PyInstaller version")
 
         except:
             print('[!] Error : The file is not a pyinstaller archive')
@@ -266,9 +268,8 @@ class PyInstArchive:
             f.write(data)
 
 
-    def extractFiles(self):
+    def extractFiles(self, extractionDir):
         print('[+] Beginning extraction...please standby')
-        extractionDir = os.path.join(os.getcwd(), os.path.basename(self.filePath) + '_extracted')
 
         if not os.path.exists(extractionDir):
             os.mkdir(extractionDir)
@@ -399,25 +400,40 @@ class PyInstArchive:
                 else:
                     self._writePyc(filePath, data)
 
-
 def main():
-    if len(sys.argv) < 2:
-        print('[+] Usage: pyinstxtractor.py <filename>')
+    if len(sys.argv) != 4:
+        print("Usage: test.py <i|e> <output_dir> <archive_path>")
+        exit(1)
 
+    if sys.argv[1] == "i":
+        info_mode = True
+    elif sys.argv[1] == "e":
+        info_mode = False
     else:
-        arch = PyInstArchive(sys.argv[1])
-        if arch.open():
-            if arch.checkFile():
-                if arch.getCArchiveInfo():
-                    arch.parseTOC()
-                    arch.extractFiles()
+        raise ValueError("Invalid info_mode switch")
+
+    output_dir = sys.argv[2]
+    archive_path = sys.argv[3]
+
+    arch = PyInstArchive(archive_path)
+    if arch.open():
+        if arch.checkFile():
+            if arch.getCArchiveInfo():
+                if info_mode:
+                    print("[*] Required python version: <{}.{}>".format(arch.pymaj, arch.pymin))
                     arch.close()
-                    print('[+] Successfully extracted pyinstaller archive: {0}'.format(sys.argv[1]))
-                    print('')
-                    print('You can now use a python decompiler on the pyc files within the extracted directory')
                     return
 
-            arch.close()
+                arch.parseTOC()
+                arch.extractFiles(output_dir)
+                arch.close()
+                print('[+] Successfully extracted pyinstaller archive: {0}'.format(sys.argv[1]))
+                print('')
+                print('You can now use a python decompiler on the pyc files within the extracted directory')
+                arch.close()
+                return
+
+        arch.close()
 
 
 if __name__ == '__main__':
